@@ -9,10 +9,10 @@ import Control.Monad (forever, forM_)
 import qualified Data.ByteString.Char8 as B
 import Network.Socket (HostName)
 import Network.Socket.Internal (PortNumber)
-import Data.Text (Text, isSuffixOf, pack)
+import Data.Text (Text, pack)
 
 import Options.Applicative (option, auto, long, showDefault, value, help, helper, fullDesc,
-                            progDesc, execParser, info, str,
+                            progDesc, execParser, info, str, switch,
                             (<**>), Parser)
 
 import System.Hardware.OneWire.Thermal
@@ -25,6 +25,7 @@ data Options = Options { optTopic :: Text
                        , optPass :: Text
                        , optClient :: Text
                        , optPeriod :: Int
+                       , optAppendSN :: Bool
                        }
 
 options :: Parser Options
@@ -37,10 +38,11 @@ options = Options
   <*> option str (long "pass" <> value "" <> help "mqtt password")
   <*> option str (long "client" <> value "thermqtt" <> help "mqtt client name")
   <*> option auto (long "period" <> showDefault <> value 5 <> help "time between readings")
+  <*> switch (long "appendsn" <> help "append serial number to topic")
 
 mktopic :: Options -> ThermalSerial -> MQTT.Topic
 mktopic opts (ThermalSerial s)
-  | "/" `isSuffixOf` optTopic opts = fromText $ optTopic opts <> pack s
+  | optAppendSN opts = fromText $ optTopic opts <> pack s
   | otherwise = fromText $ optTopic opts
 
   where fromText = MQTT.toTopic . MQTT.MqttText
