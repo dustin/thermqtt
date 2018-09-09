@@ -42,6 +42,8 @@ executables:
     - scientific
     - bytestring
     - text
+    - optparse-applicative
+    - network
 
 tests:
   thermqtt-test:
