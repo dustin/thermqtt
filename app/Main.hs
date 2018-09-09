@@ -21,8 +21,8 @@ import qualified Network.MQTT as MQTT
 data Options = Options { optTopic :: Text
                        , optHost :: HostName
                        , optPort :: PortNumber
-                       , optUser :: Maybe Text
-                       , optPass :: Maybe Text
+                       , optUser :: Text
+                       , optPass :: Text
                        , optClient :: Text
                        , optPeriod :: Int
                        }
@@ -33,8 +33,8 @@ options = Options
                    help "mqtt topic - if ends with a slash, sensor serial number will be appended")
   <*> option str (long "host" <> showDefault <> value "localhost" <> help "mqtt host")
   <*> option auto (long "port" <> showDefault <> value 1883 <> help "mqtt port")
-  <*> option auto (long "user" <> value Nothing <> help "mqtt username")
-  <*> option auto (long "pass" <> value Nothing <> help "mqtt password")
+  <*> option str (long "user" <> value "" <> help "mqtt username")
+  <*> option str (long "pass" <> value "" <> help "mqtt password")
   <*> option str (long "client" <> value "thermqtt" <> help "mqtt client name")
   <*> option auto (long "period" <> showDefault <> value 5 <> help "time between readings")
 
@@ -54,8 +54,8 @@ go opts = do
              , MQTT.cClientID = optClient opts
              , MQTT.cHost = optHost opts
              , MQTT.cPort = optPort opts
-             , MQTT.cUsername = optUser opts
-             , MQTT.cPassword = optPass opts
+             , MQTT.cUsername = nilly $ optUser opts
+             , MQTT.cPassword = nilly $ optPass opts
              , MQTT.cKeepAlive = Just 10
              }
 
@@ -76,6 +76,9 @@ go opts = do
   -- this will throw IOExceptions
   terminated <- MQTT.run conf
   print terminated
+
+  where nilly "" = Nothing
+        nilly s = Just s
 
 main :: IO ()
 main = execParser opts >>= go
