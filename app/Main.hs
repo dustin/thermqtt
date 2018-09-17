@@ -69,7 +69,7 @@ go opts = do
           maybe
             (pure ())
             (\c ->
-               MQTT.publish conf MQTT.NoConfirm False (mktopic opts serial) (B.pack $ show c)
+               MQTT.publish conf MQTT.NoConfirm True (mktopic opts serial) (B.pack $ show c)
             )
             mc)
 
