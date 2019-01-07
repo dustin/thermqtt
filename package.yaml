@@ -36,7 +36,7 @@ executables:
     - -Wall
     dependencies:
     - thermqtt
-    - mqtt-hs
+    - net-mqtt
     - stm
     - w1-therm-haskell
     - scientific

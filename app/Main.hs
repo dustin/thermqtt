@@ -1,30 +1,30 @@
-{-# Language OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Main where
 
-import Data.Semigroup ((<>))
-import Control.Concurrent (forkIO, threadDelay)
-import Control.Concurrent.STM (newTChanIO)
-import Control.Monad (forever, forM_)
-import qualified Data.ByteString.Char8 as B
-import Network.Socket (HostName)
-import Network.Socket.Internal (PortNumber)
-import Data.Text (Text, pack)
+import           Control.Concurrent              (threadDelay)
+import           Control.Monad                   (forM_, forever)
+import qualified Data.ByteString.Lazy.Char8      as BC
+import           Data.Semigroup                  ((<>))
+import           Data.Text                       (Text, pack)
 
-import Options.Applicative (option, auto, long, showDefault, value, help, helper, fullDesc,
-                            progDesc, execParser, info, str, switch,
-                            (<**>), Parser)
+import           Options.Applicative             (Parser, auto, execParser,
+                                                  fullDesc, help, helper, info,
+                                                  long, option, progDesc,
+                                                  showDefault, str, switch,
+                                                  value, (<**>))
 
-import System.Hardware.OneWire.Thermal
-import qualified Network.MQTT as MQTT
+import           Network.MQTT.Client
+import           System.Hardware.OneWire.Thermal
 
-data Options = Options { optTopic :: Text
-                       , optHost :: HostName
-                       , optPort :: PortNumber
-                       , optUser :: Text
-                       , optPass :: Text
-                       , optClient :: Text
-                       , optPeriod :: Int
+data Options = Options { optTopic    :: Text
+                       , optHost     :: String
+                       , optPort     :: Int
+                       , optUser     :: String
+                       , optPass     :: String
+                       , optClient   :: String
+                       , optPeriod   :: Int
                        , optAppendSN :: Bool
                        }
 
@@ -40,47 +40,34 @@ options = Options
   <*> option auto (long "period" <> showDefault <> value 5 <> help "time between readings")
   <*> switch (long "appendsn" <> help "append serial number to topic")
 
-mktopic :: Options -> ThermalSerial -> MQTT.Topic
-mktopic opts (ThermalSerial s)
-  | optAppendSN opts = fromText $ optTopic opts <> pack s
-  | otherwise = fromText $ optTopic opts
-
-  where fromText = MQTT.toTopic . MQTT.MqttText
-
 go :: Options -> IO ()
-go opts = do
-  cmds <- MQTT.mkCommands
-  pubChan <- newTChanIO
-  let conf = (MQTT.defaultConfig cmds pubChan)
-             { MQTT.cClean = False
-             , MQTT.cClientID = optClient opts
-             , MQTT.cHost = optHost opts
-             , MQTT.cPort = optPort opts
-             , MQTT.cUsername = nilly $ optUser opts
-             , MQTT.cPassword = nilly $ optPass opts
-             , MQTT.cKeepAlive = Just 10
-             }
+go Options{..} = do
+  mc <- runClient mqttConfig{_hostname=optHost, _port=optPort, _connID=optClient,
+                             _cleanSession=False,
+                             _username=nilly $ optUser, _password=nilly $ optPass
+                            }
 
-  _ <- forkIO $ forever $ do
+  -- This will throw an exception if the MQTT client disconnects and a
+  -- message can't be sent.
+  forever $ do
     serials <- thermalSerials
     forM_ serials
       (\serial -> do
-          mc <- thermalSensorCelsius serial
+          val <- thermalSensorCelsius serial
           maybe
             (pure ())
-            (\c ->
-               MQTT.publish conf MQTT.NoConfirm True (mktopic opts serial) (B.pack $ show c)
-            )
-            mc)
+            (\c -> publish mc (mktopic serial) (BC.pack $ show c) True)
+            val)
 
-    threadDelay (optPeriod opts * 1000000)
-
-  -- this will throw IOExceptions
-  terminated <- MQTT.run conf
-  print terminated
+    threadDelay (optPeriod * 1000000)
 
   where nilly "" = Nothing
-        nilly s = Just s
+        nilly s  = Just s
+
+        mktopic :: ThermalSerial -> Text
+        mktopic (ThermalSerial s)
+          | optAppendSN = optTopic <> pack s
+          | otherwise = optTopic
 
 main :: IO ()
 main = execParser opts >>= go
