@@ -56,7 +56,7 @@ go Options{..} = do
           val <- thermalSensorCelsius serial
           maybe
             (pure ())
-            (\c -> publish mc (mktopic serial) (BC.pack $ show c) True)
+            (\c -> publishq mc (mktopic serial) (BC.pack $ show c) True QoS1)
             val)
 
     threadDelay (optPeriod * 1000000)
