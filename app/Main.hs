@@ -44,7 +44,8 @@ go :: Options -> IO ()
 go Options{..} = do
   mc <- runClient mqttConfig{_hostname=optHost, _port=optPort, _connID=optClient,
                              _cleanSession=False,
-                             _username=nilly $ optUser, _password=nilly $ optPass
+                             _username=nilly $ optUser, _password=nilly $ optPass,
+                             _protLvl=Protocol50
                             }
 
   -- This will throw an exception if the MQTT client disconnects and a
@@ -56,7 +57,8 @@ go Options{..} = do
           val <- thermalSensorCelsius serial
           maybe
             (pure ())
-            (\c -> publishq mc (mktopic serial) (BC.pack $ show c) True QoS1)
+            (\c -> pubAliased mc (mktopic serial) (BC.pack $ show c) True QoS2 [
+                PropMessageExpiryInterval 900])
             val)
 
     threadDelay (optPeriod * 1000000)
