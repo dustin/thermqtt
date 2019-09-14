@@ -45,7 +45,7 @@ go Options{..} = do
   mc <- runClient mqttConfig{_hostname=optHost, _port=optPort, _connID=optClient,
                              _cleanSession=False,
                              _username=nilly $ optUser, _password=nilly $ optPass,
-                             _protLvl=Protocol50
+                             _protocol=Protocol50
                             }
 
   -- This will throw an exception if the MQTT client disconnects and a
