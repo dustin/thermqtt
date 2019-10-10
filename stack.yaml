@@ -41,7 +41,9 @@ packages:
 extra-deps:
 - git: https://github.com/eamsden/w1-therm-haskell
   commit: f6a6cb68db421eef76b767482814463e180d1bad
-- net-mqtt-0.5.0.2
+- git: https://github.com/dustin/mqtt-hs
+  commit: ff407ea1754ae11d60b53e115f36c6f9b01cc79e
+# - net-mqtt-0.6.0.0
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
