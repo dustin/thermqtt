@@ -6,24 +6,21 @@ module Main where
 import           Control.Concurrent              (threadDelay)
 import           Control.Monad                   (forM_, forever)
 import qualified Data.ByteString.Lazy.Char8      as BC
+import           Data.Maybe                      (fromJust)
 import           Data.Semigroup                  ((<>))
 import           Data.Text                       (Text, pack)
-
+import           Network.URI
 import           Options.Applicative             (Parser, auto, execParser,
                                                   fullDesc, help, helper, info,
-                                                  long, option, progDesc,
-                                                  showDefault, str, switch,
-                                                  value, (<**>))
+                                                  long, maybeReader, option,
+                                                  progDesc, short, showDefault,
+                                                  str, switch, value, (<**>))
 
 import           Network.MQTT.Client
 import           System.Hardware.OneWire.Thermal
 
 data Options = Options { optTopic    :: Text
-                       , optHost     :: String
-                       , optPort     :: Int
-                       , optUser     :: String
-                       , optPass     :: String
-                       , optClient   :: String
+                       , optUri      :: URI
                        , optPeriod   :: Int
                        , optAppendSN :: Bool
                        }
@@ -32,21 +29,13 @@ options :: Parser Options
 options = Options
   <$> option str (long "topic" <> showDefault <> value "therm/" <>
                    help "mqtt topic - if ends with a slash, sensor serial number will be appended")
-  <*> option str (long "host" <> showDefault <> value "localhost" <> help "mqtt host")
-  <*> option auto (long "port" <> showDefault <> value 1883 <> help "mqtt port")
-  <*> option str (long "user" <> value "" <> help "mqtt username")
-  <*> option str (long "pass" <> value "" <> help "mqtt password")
-  <*> option str (long "client" <> value "thermqtt" <> help "mqtt client name")
+  <*> option (maybeReader parseURI) (long "mqtt-uri" <> short 'u' <> showDefault <> value (fromJust $ parseURI "mqtt://localhost/") <> help "mqtt broker URI")
   <*> option auto (long "period" <> showDefault <> value 5 <> help "time between readings")
   <*> switch (long "appendsn" <> help "append serial number to topic")
 
 go :: Options -> IO ()
 go Options{..} = do
-  mc <- runClient mqttConfig{_hostname=optHost, _port=optPort, _connID=optClient,
-                             _cleanSession=False,
-                             _username=nilly $ optUser, _password=nilly $ optPass,
-                             _protocol=Protocol50
-                            }
+  mc <- connectURI mqttConfig{_protocol=Protocol50} optUri
 
   -- This will throw an exception if the MQTT client disconnects and a
   -- message can't be sent.
@@ -63,13 +52,10 @@ go Options{..} = do
 
     threadDelay (optPeriod * 1000000)
 
-  where nilly "" = Nothing
-        nilly s  = Just s
-
-        mktopic :: ThermalSerial -> Text
+  where mktopic :: ThermalSerial -> Text
         mktopic (ThermalSerial s)
           | optAppendSN = optTopic <> pack s
-          | otherwise = optTopic
+          | otherwise   = optTopic
 
 main :: IO ()
 main = execParser opts >>= go
